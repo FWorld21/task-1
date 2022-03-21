@@ -3,6 +3,7 @@ import os
 import re
 import sys
 from optparse import OptionParser
+from tkinter import N
 
 parser = OptionParser()
 parser.add_option("-p", "--path", dest="path",
@@ -28,42 +29,44 @@ class MainParser:
     def convert_output(self):
         """This method return dictionary from file, specified in constructor"""
         if self.check_for_errors():
-            guid = ''
-            rail_letter = ''
             output_in_dict = {
                 
             }
             with open(self.file_location, "r") as file_r:
-                for string in file_r:
-                    guid_pattern = re.search(r"([A-Z0-9]{3};[A-Z0-9]{1,5}-\d{1,3}-\d{1,3}:[A-Z0-9]+\/[A-Z0-9]{2,3}) GUID=(0x[0-9a-f]{16})", string)
-                    rail_pattern = re.search(r"rail ([A-Z]+)\(([0-9a-f]{4}:[0-9a-f]{2}\.[0-9a-f]{2}\.[0-9a-f]{2})\): ([0-9]+)", string)
-                    ports_pattern = re.search(r"([A-Z0-9]{1,5}-\d{1,3}-\d{1,3}(?:\/[A-Za-z0-9]+)+) <--> ([A-Z0-9]{1,4}-\d{1,3}-\d{1,3}(?:\/[A-Za-z0-9]+)+)", string)
+                blocks_array = re.findall(r"[^\s\n\r]+[^\r\n]+(?:\r?\n\s{4,}[^\r\n]+)+", file_r.read())
+                if blocks_array is None:
+                    print("[!] Output from " + __file__ + "\nSpecified file has incorrect format for parser")
+                    sys.exit(1)
+                for block in blocks_array:
+                    guid_and_switch = re.search(r"^[^\r\n]+: ([^\s\r\n]+) GUID=(0x[0-9A-Fa-f]{16})", block)
                     
-                    if string[0] == "#":  # Check for comments:
-                        continue
-                    if guid_pattern:  # For getting GUID
-                        guid = guid_pattern.group(2)
-                        output_in_dict[guid] = {
-                            'switch': guid_pattern.group(1),
-                            'rails': {}
-                        }
-                    elif rail_pattern:  # For getting all info about rail
-                        rail_letter = rail_pattern.group(1)
+                    if guid_and_switch is None:
+                        print("[!] Output from " + __file__ + "\nGUID or switch not found. Please check specified file")
+                        sys.exit(1)
+                    
+                    switch = guid_and_switch.group(1)
+                    guid = guid_and_switch.group(2)
+                    output_in_dict[guid] = {
+                        'switch': switch,
+                        'rails': {}
+                    }
+                    rail_array = re.findall(r"\s{4}rail[^\r\n]+(?:\r?\n\s{8,}[^\r\n]+)+", block)
+                    for rail in rail_array:
+                        rail_params = re.search(r"rail ([A-Z0-9]+)\(([^)]+)\): (\d+)", rail)
+                        rail_letter = rail_params.group(1)
+                        rail_pci = rail_params.group(2)
+                        number_of_ports = rail_params.group(3)
+                        rail_ports_list = []
+                        rail_ports_regex_output = re.findall(r"\s{8,}\S+ <--> [^\s\r\n]+", rail)
+                        for rail_port in rail_ports_regex_output:
+                            rail_port_params = re.search(r"(\S+) <--> ([^\s\r\n]+)", rail_port)
+                            rail_ports_list.append(rail_port_params.group(1))
+                        
                         output_in_dict[guid]['rails'][rail_letter] = {
-                                'rail_pci': rail_pattern.group(2),
-                                'number_of_ports': rail_pattern.group(3),
-                                'ports': [
-
-                                ]
-                            }
-                    elif ports_pattern:  # For getting ports from rail
-                        output_in_dict[guid]['rails'][rail_letter]['ports'].append(
-                            (
-                                ports_pattern.group(1), 
-                                ports_pattern.group(2)
-                            )
-                        )
-
+                            'rail_pci': rail_pci,
+                            'number_of_ports': number_of_ports,
+                            'ports': tuple(rail_ports_list)
+                        }
             return output_in_dict
 
     def show_output(self):
