@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import re
 import sys
 from optparse import OptionParser
 
@@ -36,25 +37,28 @@ class MainParser:
                     if string[0] == "#":  # Check for comments:
                         continue
                     if "Node rail connectivity mismatch on the switch" in string:  # For getting GUID
-                        guid = string.split("=")[-1].replace("\n", "")
+                        re_pattern = re.search(r"([A-Z0-9]{3};[A-Z0-9]{1,5}-\d{1,3}-\d{1,3}:[A-Z0-9]+\/[A-Z0-9]{2,3}) GUID=(0x[0-9a-f]{16})", string)
+                        guid = re_pattern.group(2)
                         output_in_dict[guid] = {
-                            'switch': string.split(": ")[-1].split(" ")[0],
+                            'switch': re_pattern.group(1),
                             'rails': {}
                         }
                     elif ' rail ' in string:  # For getting all info about rail
-                        rail_letter = string.split("(")[0].split(" ")[-1]
+                        rail_pattern = re.search(r"rail ([A-Z]+)\(([0-9a-f]{4}:[0-9a-f]{2}\.[0-9a-f]{2}\.[0-9a-f]{2})\): ([0-9]+)", string)
+                        rail_letter = rail_pattern.group(1)
                         output_in_dict[guid]['rails'][rail_letter] = {
-                                'rail_pci': string.split("(")[-1].split(")")[0],
-                                'number_of_ports': string.split(": ")[-1].split(" ")[0],
+                                'rail_pci': rail_pattern.group(2),
+                                'number_of_ports': rail_pattern.group(3),
                                 'ports': [
 
                                 ]
                             }
                     elif ' <--> ' in string:  # For getting ports from rail
+                        ports_pattern = re.search(r"([A-Z0-9]{1,5}-\d{1,3}-\d{1,3}(?:\/[A-Za-z0-9]+)+) <--> ([A-Z0-9]{1,4}-\d{1,3}-\d{1,3}(?:\/[A-Za-z0-9]+)+)", string)
                         output_in_dict[guid]['rails'][rail_letter]['ports'].append(
                             (
-                                string.split(' <--> ')[0].replace(" ", "").replace("\n", ""), 
-                                string.split(' <--> ')[1].replace(" ", "").replace("\n", "")
+                                ports_pattern.group(1), 
+                                ports_pattern.group(2)
                             )
                         )
 
