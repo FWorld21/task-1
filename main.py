@@ -23,6 +23,7 @@ class MainParser:
             print("[!] Output from " + __file__ + "\nFile " + self.file_location + " not found!")
             sys.exit(1)
         return True
+
     
     def convert_output(self):
         """This method return dictionary from file, specified in constructor"""
@@ -34,17 +35,19 @@ class MainParser:
             }
             with open(self.file_location, "r") as file_r:
                 for string in file_r:
+                    guid_pattern = re.search(r"([A-Z0-9]{3};[A-Z0-9]{1,5}-\d{1,3}-\d{1,3}:[A-Z0-9]+\/[A-Z0-9]{2,3}) GUID=(0x[0-9a-f]{16})", string)
+                    rail_pattern = re.search(r"rail ([A-Z]+)\(([0-9a-f]{4}:[0-9a-f]{2}\.[0-9a-f]{2}\.[0-9a-f]{2})\): ([0-9]+)", string)
+                    ports_pattern = re.search(r"([A-Z0-9]{1,5}-\d{1,3}-\d{1,3}(?:\/[A-Za-z0-9]+)+) <--> ([A-Z0-9]{1,4}-\d{1,3}-\d{1,3}(?:\/[A-Za-z0-9]+)+)", string)
+                    
                     if string[0] == "#":  # Check for comments:
                         continue
-                    if "Node rail connectivity mismatch on the switch" in string:  # For getting GUID
-                        re_pattern = re.search(r"([A-Z0-9]{3};[A-Z0-9]{1,5}-\d{1,3}-\d{1,3}:[A-Z0-9]+\/[A-Z0-9]{2,3}) GUID=(0x[0-9a-f]{16})", string)
-                        guid = re_pattern.group(2)
+                    if guid_pattern:  # For getting GUID
+                        guid = guid_pattern.group(2)
                         output_in_dict[guid] = {
-                            'switch': re_pattern.group(1),
+                            'switch': guid_pattern.group(1),
                             'rails': {}
                         }
-                    elif ' rail ' in string:  # For getting all info about rail
-                        rail_pattern = re.search(r"rail ([A-Z]+)\(([0-9a-f]{4}:[0-9a-f]{2}\.[0-9a-f]{2}\.[0-9a-f]{2})\): ([0-9]+)", string)
+                    elif rail_pattern:  # For getting all info about rail
                         rail_letter = rail_pattern.group(1)
                         output_in_dict[guid]['rails'][rail_letter] = {
                                 'rail_pci': rail_pattern.group(2),
@@ -53,8 +56,7 @@ class MainParser:
 
                                 ]
                             }
-                    elif ' <--> ' in string:  # For getting ports from rail
-                        ports_pattern = re.search(r"([A-Z0-9]{1,5}-\d{1,3}-\d{1,3}(?:\/[A-Za-z0-9]+)+) <--> ([A-Z0-9]{1,4}-\d{1,3}-\d{1,3}(?:\/[A-Za-z0-9]+)+)", string)
+                    elif ports_pattern:  # For getting ports from rail
                         output_in_dict[guid]['rails'][rail_letter]['ports'].append(
                             (
                                 ports_pattern.group(1), 
