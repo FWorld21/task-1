@@ -3,7 +3,6 @@ import os
 import re
 import sys
 from optparse import OptionParser
-from tkinter import N
 
 parser = OptionParser()
 parser.add_option("-p", "--path", dest="path",
@@ -60,12 +59,11 @@ class MainParser:
                         rail_ports_regex_output = re.findall(r"\s{8,}\S+ <--> [^\s\r\n]+", rail)
                         for rail_port in rail_ports_regex_output:
                             rail_port_params = re.search(r"(\S+) <--> ([^\s\r\n]+)", rail_port)
-                            rail_ports_list.append(rail_port_params.group(1))
-                        
+                            rail_ports_list.append((rail_port_params.group(1), rail_port_params.group(2)))
                         output_in_dict[guid]['rails'][rail_letter] = {
                             'rail_pci': rail_pci,
                             'number_of_ports': number_of_ports,
-                            'ports': tuple(rail_ports_list)
+                            'ports': rail_ports_list
                         }
             return output_in_dict
 
